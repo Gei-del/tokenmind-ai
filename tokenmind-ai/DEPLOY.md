@@ -343,8 +343,28 @@ curl https://TU-BACKEND.railway.app/health
 ### Error: `CORS`
 → Actualiza `FRONTEND_URL` en Railway con la URL exacta de Vercel (con https y sin slash final).
 
+### Error: `NOT_FOUND` (página en blanco / 404 de Vercel)
+
+Vercel devuelve `NOT_FOUND` cuando despliega el directorio equivocado y no encuentra las rutas de Next.js.
+
+**Causa raíz:** El proyecto Vercel apunta a la raíz del repositorio, pero la app Next.js vive en `tokenmind-ai/frontend/`. Si `vercel.json` no está presente en la raíz del repo (o no configura los comandos correctos), Vercel no detecta Next.js y las rutas no existen en el despliegue.
+
+**Solución aplicada:** Se creó `vercel.json` en la **raíz del repositorio** con:
+- `buildCommand` → `cd tokenmind-ai/frontend && npm run build`
+- `installCommand` → `cd tokenmind-ai/frontend && npm install`
+- `outputDirectory` → `tokenmind-ai/frontend/.next`
+- `framework` → `nextjs`
+- Variables de entorno usando referencias Vercel (e.g. `@auth0_secret`)
+
+**Requisito:** El proyecto en Vercel debe tener **Root Directory** configurado como la **raíz del repositorio** (vacío / `/`), no `tokenmind-ai/` ni `tokenmind-ai/frontend/`. El `vercel.json` en la raíz se encarga de navegar al subdirectorio correcto.
+
+**Si el error persiste:**
+1. Vercel Dashboard → tu proyecto → **Settings → General → Root Directory**: debe estar **vacío** (raíz del repo).
+2. Verifica que `vercel.json` exista en la raíz del repo y contenga `buildCommand` con la ruta a `tokenmind-ai/frontend`.
+3. Re-despliega desde Vercel Dashboard → **Deployments → Redeploy**.
+
 ### El build de Vercel falla
-→ Verifica que el **Root Directory** en Vercel sea `frontend`, no la raíz del repo.
+→ Verifica que el **Root Directory** en Vercel esté **vacío** (raíz del repo) y que `vercel.json` esté en la raíz del repositorio apuntando a `tokenmind-ai/frontend`.
 
 ---
 
