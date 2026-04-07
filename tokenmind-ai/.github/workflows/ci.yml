@@ -1,0 +1,120 @@
+name: CI — TokenMind AI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─── Job 1: Lint y build del frontend ─────────────────────────────────────
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+        # Falla si hay errores de ESLint
+
+      - name: Build de producción
+        # Variables mínimas para que Next.js pueda hacer el build
+        env:
+          AUTH0_SECRET: 'ci-build-secret-placeholder-32chars!!'
+          AUTH0_BASE_URL: 'http://localhost:3000'
+          AUTH0_ISSUER_BASE_URL: 'https://placeholder.auth0.com'
+          AUTH0_CLIENT_ID: 'ci_placeholder_client_id'
+          AUTH0_CLIENT_SECRET: 'ci_placeholder_secret'
+          AUTH0_AUDIENCE: 'https://tokenmind-api'
+          BACKEND_URL: 'http://localhost:4000'
+        run: npm run build
+
+  # ─── Job 2: Validación del backend ────────────────────────────────────────
+  backend:
+    name: Backend (Node.js)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar sintaxis (node --check)
+        run: |
+          node --check server.js
+          node --check orchestrator.js
+          node --check agents/emailAgent.js
+          node --check agents/calendarAgent.js
+          node --check services/auth0Service.js
+
+  # ─── Job 3: Security audit ─────────────────────────────────────────────────
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Audit frontend
+        working-directory: frontend
+        run: npm audit --audit-level=high || true
+        # "|| true" para no bloquear el pipeline en dependencias de dev
+
+      - name: Audit backend
+        working-directory: backend
+        run: npm audit --audit-level=high || true
+
+      - name: Verificar que .env no está en el repo
+        run: |
+          if find . -name ".env" -not -path "*/node_modules/*" | grep -q ".env$"; then
+            echo "❌ ERROR: Archivo .env encontrado en el repositorio"
+            exit 1
+          else
+            echo "✅ No se encontraron archivos .env expuestos"
+          fi
+
+      - name: Verificar que no hay secrets hardcodeados
+        run: |
+          # Busca patrones comunes de secrets expuestos
+          if grep -r "client_secret\s*=\s*['\"][^'\"]\+['\"]" --include="*.js" --include="*.ts" \
+             --exclude-dir=node_modules --exclude-dir=.next .; then
+            echo "❌ ERROR: Posible secret hardcodeado encontrado"
+            exit 1
+          else
+            echo "✅ No se detectaron secrets hardcodeados"
+          fi
