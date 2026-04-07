@@ -346,6 +346,15 @@ curl https://TU-BACKEND.railway.app/health
 ### El build de Vercel falla
 → Verifica que el **Root Directory** en Vercel sea `frontend`, no la raíz del repo.
 
+
+### Error: `NOT_FOUND` en Vercel
+→ Vercel está desplegando la raíz del repo en lugar de `frontend`.
+
+Checklist rápido:
+1. En Vercel → Project Settings → **Root Directory** debe ser `frontend`.
+2. Si ya existe el proyecto, haz **Redeploy** después de cambiar el Root Directory.
+3. Este ajuste **no** se puede forzar desde código (`vercel.json` no define Root Directory del proyecto). Debes configurarlo en Vercel UI.
+
 ---
 
 ## URLs finales de referencia
